@@ -1,0 +1,51 @@
+#!/bin/bash
+
+		INTERVAL=1
+
+		if [ -z "$1" ]; then
+			echo usage: $0 [network-interface]
+			exit
+		fi
+
+# Check received and transmitted data
+		R1=`cat /sys/class/net/$1/statistics/rx_bytes`
+		T1=`cat /sys/class/net/$1/statistics/tx_bytes`
+
+# Calculate CPU usage while waiting for statistics to update
+		CPU=$({ head -n1 /proc/stat;sleep $INTERVAL;head -n1 /proc/stat; } | \
+			awk '/^cpu /{u=$2-u;s=$4-s;i=$5-i;w=$6-w}END \
+			{print int(0.5+100*(u+s+w)/(u+s+i+w))}')
+
+# Check values again
+		R2=`cat /sys/class/net/$1/statistics/rx_bytes`
+		T2=`cat /sys/class/net/$1/statistics/tx_bytes`
+
+# Substract and divide by interval to get values per second
+		TBPS=$(bc <<< "scale=0; `expr $T2 - $T1` / $INTERVAL")
+		RBPS=$(bc <<< "scale=0; `expr $R2 - $R1` / $INTERVAL")
+
+# Print transmitted and received data with correct units
+		if [ $TBPS -ge 1024 ]; then
+			TKBPS=`expr $TBPS / 1024`
+			if [ $TKBPS -ge 1024 ]; then
+				TMBPS=$(bc <<< "scale=1; $TKBPS / 1024")
+				printf "%5.5s" "$TMBPS" "MB↑"
+			else printf "%5.5s" "$TKBPS" "KB↑"
+			fi
+		else printf "%5.5s" "$TBPS" "B↑"
+		fi
+
+		if [ $RBPS -ge 1024 ]; then
+			RKBPS=`expr $RBPS / 1024`
+			if [ $RKBPS -ge 1024 ]; then
+				RMBPS=$(bc <<< "scale=1; $RKBPS / 1024")
+				printf "%5.5s" "$RMBPS" "MB↓"
+			else printf "%5.5s" "$RKBPS" "KB↓"
+			fi
+		else printf "%5.5s" "$RBPS" "B↓"
+		fi
+
+# Print CPU usage, memory and temperature
+		printf " %4.4s" "$CPU% "
+		printf "%s " "$(free -h | awk '/^Mem:/ {print $3}')"
+		printf "%3s\n" "$(sensors | sed -e "s/\.0//" -e '3q;d' | cut -d' ' -f5)"
