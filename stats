@@ -20,7 +20,7 @@
 		R2=`cat /sys/class/net/$1/statistics/rx_bytes`
 		T2=`cat /sys/class/net/$1/statistics/tx_bytes`
 
-# Substract and divide by interval to get values per second
+# Subtract and divide by interval to get values per second
 		TBPS=$(bc <<< "scale=0; `expr $T2 - $T1` / $INTERVAL")
 		RBPS=$(bc <<< "scale=0; `expr $R2 - $R1` / $INTERVAL")
 
